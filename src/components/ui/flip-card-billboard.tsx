@@ -1,6 +1,5 @@
 "use client"
-
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { ChevronLeft, ChevronRight } from "lucide-react"
@@ -10,9 +9,6 @@ interface Slide {
     title: string
     subtitle: string
     description: string
-    frontColor: string
-    backColor: string
-    textColor: string
     image?: string
 }
 
@@ -22,9 +18,6 @@ const slides: Slide[] = [
         title: "РЕКЛАМНЫЙ",
         subtitle: "БИЛБОРД",
         description: "Эффектная анимация перелистывания",
-        frontColor: "bg-blue-500",
-        backColor: "bg-orange-500",
-        textColor: "text-white",
         image: "/1.png",
     },
     {
@@ -32,9 +25,6 @@ const slides: Slide[] = [
         title: "НОВЫЙ",
         subtitle: "ПРОДУКТ",
         description: "Уже в продаже!",
-        frontColor: "bg-orange-500",
-        backColor: "bg-green-500",
-        textColor: "text-white",
         image: "/2.png",
     },
     {
@@ -42,9 +32,6 @@ const slides: Slide[] = [
         title: "СПЕЦИАЛЬНОЕ",
         subtitle: "ПРЕДЛОЖЕНИЕ",
         description: "Скидка до 50%",
-        frontColor: "bg-green-500",
-        backColor: "bg-purple-500",
-        textColor: "text-white",
         image: "/3.png",
     },
     {
@@ -52,9 +39,6 @@ const slides: Slide[] = [
         title: "ПРЕМИУМ",
         subtitle: "КАЧЕСТВО",
         description: "Лучший выбор года",
-        frontColor: "bg-purple-500",
-        backColor: "bg-yellow-500",
-        textColor: "text-white",
         image: "/4.png",
     },
     {
@@ -62,9 +46,6 @@ const slides: Slide[] = [
         title: "ОГРАНИЧЕННАЯ",
         subtitle: "СЕРИЯ",
         description: "Только до конца месяца",
-        frontColor: "bg-yellow-500",
-        backColor: "bg-blue-500",
-        textColor: "text-white",
         image: "/5.png",
     },
 ]
@@ -74,14 +55,41 @@ export default function Component() {
     const [nextSlide, setNextSlide] = useState(1)
     const [isFlipping, setIsFlipping] = useState(false)
     const [direction, setDirection] = useState<"left" | "right">("right")
+    const [autoScrollEnabled, setAutoScrollEnabled] = useState(false)
+    const [hovered, setHovered] = useState(false)
+
+    // Получаем настройки из .env
+    const enableAutoScroll = process.env.NEXT_PUBLIC_AUTO_SCROLL_ENABLED === "true"
+    const pauseOnHover = process.env.NEXT_PUBLIC_AUTO_SCROLL_PAUSE_ON_HOVER === "true"
+    const autoScrollInterval = parseInt(process.env.NEXT_PUBLIC_AUTO_SCROLL_INTERVAL || "5000")
+
+    useEffect(() => {
+        if (!enableAutoScroll) return
+
+        let intervalId: NodeJS.Timeout
+
+        const startInterval = () => {
+            intervalId = setInterval(() => {
+                goToNext()
+            }, autoScrollInterval)
+        }
+
+        const stopInterval = () => {
+            clearInterval(intervalId)
+        }
+
+        startInterval()
+
+        return () => {
+            stopInterval()
+        }
+    }, [enableAutoScroll, autoScrollInterval])
 
     const handleSlideChange = (newIndex: number, slideDirection: "left" | "right") => {
         if (isFlipping) return
-
         setDirection(slideDirection)
         setNextSlide(newIndex)
         setIsFlipping(true)
-
         setTimeout(() => {
             setCurrentSlide(newIndex)
             setIsFlipping(false)
@@ -104,11 +112,19 @@ export default function Component() {
         handleSlideChange(index, slideDirection)
     }
 
+    const toggleAutoScroll = () => {
+        setAutoScrollEnabled(!autoScrollEnabled)
+    }
+
     const current = slides[currentSlide]
     const next = slides[nextSlide]
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-slate-900 to-slate-700 p-8">
+        <div
+            className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-slate-900 to-slate-700 p-8"
+            onMouseEnter={() => pauseOnHover && setHovered(true)}
+            onMouseLeave={() => pauseOnHover && setHovered(false)}
+        >
             {/* Навигационные кнопки */}
             <div className="flex items-center gap-8 mb-8">
                 <Button
@@ -121,14 +137,12 @@ export default function Component() {
                     <ChevronLeft className="w-5 h-5" />
                     Назад
                 </Button>
-
                 <div className="text-white text-center">
                     <div className="text-sm opacity-70">Слайд</div>
                     <div className="text-lg font-bold">
                         {currentSlide + 1} / {slides.length}
                     </div>
                 </div>
-
                 <Button
                     onClick={goToNext}
                     disabled={isFlipping}
@@ -141,17 +155,14 @@ export default function Component() {
                 </Button>
             </div>
 
-            {/* Карточка с анимацией */}
+            {/* Карточка слайдера */}
             <div className="relative w-[800px] h-[600px]">
                 <Card className="w-full h-full relative overflow-hidden rounded-xl shadow-2xl">
-                    {/* Основной контейнер для 3D эффекта */}
                     <div className="w-full h-full relative" style={{ perspective: "1200px" }}>
-                        {/* Контейнер для секций */}
                         <div className="flex h-full relative">
                             {Array.from({ length: 16 }, (_, index) => {
                                 const delay = direction === "right" ? index * 30 : (15 - index) * 30
-                                const width = 100 / 16 // Ширина каждой секции в процентах
-
+                                const width = 100 / 16
                                 return (
                                     <div
                                         key={`${currentSlide}-${index}`}
@@ -161,29 +172,24 @@ export default function Component() {
                                             width: `${width}%`,
                                         }}
                                     >
-                                        {/* Лицевая сторона - текущий слайд */}
                                         <div
-                                            className={`absolute inset-0 backface-hidden ${current.frontColor} overflow-hidden`}
+                                            className="absolute inset-0 backface-hidden overflow-hidden"
                                             style={{
                                                 transform: "rotateY(0deg)",
                                                 backgroundImage: current.image ? `url(${current.image})` : "none",
                                                 backgroundSize: "800px 100%",
                                                 backgroundPosition: `${-index * (800 / 16)}px 0`,
                                             }}
-                                        >
-                                        </div>
-
-                                        {/* Обратная сторона - следующий слайд */}
+                                        ></div>
                                         <div
-                                            className={`absolute inset-0 backface-hidden ${next.frontColor} overflow-hidden`}
+                                            className="absolute inset-0 backface-hidden overflow-hidden"
                                             style={{
                                                 transform: "rotateY(180deg)",
                                                 backgroundImage: next.image ? `url(${next.image})` : "none",
                                                 backgroundSize: "800px 100%",
                                                 backgroundPosition: `${-index * (800 / 16)}px 0`,
                                             }}
-                                        >
-                                        </div>
+                                        ></div>
                                     </div>
                                 )
                             })}
@@ -206,16 +212,13 @@ export default function Component() {
                 ))}
             </div>
 
-
             <style jsx global>{`
                 .transform-style-preserve-3d {
                     transform-style: preserve-3d;
                 }
-
                 .backface-hidden {
                     backface-visibility: hidden;
                 }
-
                 @keyframes flip {
                     0% {
                         transform: rotateY(0deg);
@@ -227,7 +230,6 @@ export default function Component() {
                         transform: rotateY(180deg);
                     }
                 }
-
                 .animate-flip {
                     animation: flip 0.6s ease-in-out forwards;
                 }
